@@ -1,0 +1,73 @@
+Parameters:
+  ExerciseBucket:
+    Description: Enter the S3 bucket name to keep the parameter file
+    Type: String
+  ParameterFile:
+    Description: Enter the file name to keep the parameters
+    Type: String
+  LambdaBucket:
+    Description: Enter the lambda source code S3 bucket name
+    Type: String
+
+Mappings: 
+  MyMaps: 
+    Parameter: 
+      Name: UserName
+    ParamValue: 
+      Name: JohnDoe
+
+Resources:
+  ExcerciseParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !FindInMap [MyMaps, Parameter, Name]
+      Type: String
+      Value: !FindInMap [MyMaps, ParamValue, Name]
+      Tags:
+        Environment: DEV
+        
+  S3Bucket:
+    Type: 'AWS::S3::Bucket'
+    DeletionPolicy: Retain
+    Properties:
+      BucketName: !Ref ExerciseBucket
+
+  LambdaRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+      Policies:
+        - PolicyName: ExerciseLambda
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: 
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+                - ssm:GetParameter
+                - s3:PutObject
+                Resource: '*'
+  ExerciseLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: python3.9
+      Role: !GetAtt LambdaRole.Arn
+      Handler: lambda.lambda_handler
+      Code:
+        S3Bucket: !Ref LambdaBucket
+        S3Key: lambda.zip
+      Environment:
+        Variables:
+          BucketName: !Ref ExerciseBucket
+          FileName: !Ref ParameterFile
